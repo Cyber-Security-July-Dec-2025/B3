@@ -49,7 +49,7 @@ async function refreshList() {
       if (q && !(c.username?.toLowerCase().includes(q) || (c.origins||[]).join(',').toLowerCase().includes(q))) continue;
       const li = document.createElement('li');
       const left = document.createElement('div');
-      left.innerHTML = `<div>${c.username || '(no username)'} <span class="small">${(c.origins||[])[0]||''}</span></div>`;
+      left.innerHTML = `<div>${escapeHtml(c.username || '(no username)')} <span class="small">${escapeHtml((c.origins||[])[0]||'')}</span></div>`;
       const right = document.createElement('div');
       const copy = document.createElement('button');
       copy.textContent = 'Copy';
@@ -63,7 +63,11 @@ async function refreshList() {
         await chrome.runtime.sendMessage({ type: 'DELETE_CREDENTIAL', id: c.id });
         refreshList();
       });
-      right.append(copy, del);
+      const edit = document.createElement('button');
+      edit.textContent = 'Edit';
+      edit.className = 'btn';
+      edit.addEventListener('click', () => openEditDialog(c));
+      right.append(edit, copy, del);
       li.append(left, right);
       list.appendChild(li);
     }
@@ -123,6 +127,44 @@ function wire() {
     await chrome.runtime.sendMessage({ type: 'LOCK' });
     showLocked();
   });
+
+  // edit dialog wiring
+  const dlg = document.getElementById('editDialog');
+  const editGen = document.getElementById('editGen');
+  const editSave = document.getElementById('editSave');
+  const editCancel = document.getElementById('editCancel');
+  editGen.addEventListener('click', async () => {
+    const r = await chrome.runtime.sendMessage({ type: 'GENERATE_PASSWORD', options: { length: 20 } });
+    if (r && r.ok) el('editPass').value = r.password;
+  });
+  editCancel.addEventListener('click', () => dlg.close());
+  editSave.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const id = el('editId').value;
+    const origins = el('editOrigins').value.split(',').map(s => s.trim()).filter(Boolean);
+    const username = el('editUser').value;
+    const password = el('editPass').value;
+    const notes = el('editNotes').value;
+    if (!id) return;
+    const credential = { id, origins, username, password, notes };
+    const r = await chrome.runtime.sendMessage({ type: 'SAVE_CREDENTIAL', credential });
+    if (r && r.ok) {
+      dlg.close();
+      refreshList();
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => { wire(); status(); });
+
+function openEditDialog(cred) {
+  el('editId').value = cred.id;
+  el('editOrigins').value = (cred.origins || []).join(', ');
+  el('editUser').value = cred.username || '';
+  el('editPass').value = cred.password || '';
+  el('editNotes').value = cred.notes || '';
+  const dlg = document.getElementById('editDialog');
+  if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.show();
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch])); }

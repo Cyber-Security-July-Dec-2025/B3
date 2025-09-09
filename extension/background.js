@@ -98,6 +98,14 @@ async function tryRestoreKeyFromSession() {
 
 chrome.runtime.onInstalled.addListener(() => {
   ensureInit();
+  // Create context menu items
+  try {
+    chrome.contextMenus.removeAll(() => {
+      chrome.contextMenus.create({ id: 'passvault_paste_username', title: 'PassVault: Paste username', contexts: ['editable'] });
+      chrome.contextMenus.create({ id: 'passvault_paste_password', title: 'PassVault: Paste password', contexts: ['editable'] });
+      chrome.contextMenus.create({ id: 'passvault_autofill', title: 'PassVault: Autofill login', contexts: ['page', 'frame', 'editable'] });
+    });
+  } catch (_) {}
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -214,4 +222,55 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
   })();
   return true; // keep channel open for async
+});
+
+async function getCredsForOrigin(origin) {
+  if (!derivedKey) await tryRestoreKeyFromSession();
+  if (!derivedKey) throw new Error('Locked');
+  const vault = await getVaultJson();
+  return (vault.creds || []).filter(c => (c.origins || []).includes(origin));
+}
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  try {
+    const url = info?.pageUrl || tab?.url;
+    if (!url || !/^https?:/i.test(url)) return;
+    const origin = new URL(url).origin;
+    const creds = await getCredsForOrigin(origin);
+    if (!creds || creds.length === 0) return;
+    const cred = creds[0]; // first match
+    if (info.menuItemId === 'passvault_paste_username') {
+      // paste into active element
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: info.frameId ? [info.frameId] : undefined, allFrames: false },
+        func: (value) => {
+          const el = document.activeElement;
+          if (!el) return;
+          const d = Object.getOwnPropertyDescriptor(el.__proto__, 'value');
+          d?.set?.call(el, value);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+        args: [cred.username || '']
+      });
+    } else if (info.menuItemId === 'passvault_paste_password') {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: info.frameId ? [info.frameId] : undefined, allFrames: false },
+        func: (value) => {
+          const el = document.activeElement;
+          if (!el) return;
+          const d = Object.getOwnPropertyDescriptor(el.__proto__, 'value');
+          d?.set?.call(el, value);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+        args: [cred.password || '']
+      });
+    } else if (info.menuItemId === 'passvault_autofill') {
+      // delegate to content script to locate proper fields and apply both
+      await chrome.tabs.sendMessage(tab.id, { type: 'APPLY_CREDENTIAL', cred, origin }, { frameId: info.frameId });
+    }
+  } catch (e) {
+    console.warn('context menu action failed', e);
+  }
 });

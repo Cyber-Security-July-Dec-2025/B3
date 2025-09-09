@@ -157,4 +157,12 @@
   // initial
   maybeAutofill(true);
   ensureSaveHook();
+
+  // respond to background requests to apply a specific credential
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg && msg.type === 'APPLY_CREDENTIAL' && msg.cred) {
+      applyCred(msg.cred);
+      sendResponse({ ok: true });
+    }
+  });
 })();

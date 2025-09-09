@@ -18,22 +18,24 @@ function shuffle(str, rnd) {
 
 export function generatePassword(options = {}) {
   const length = Math.max(8, Math.min(128, options.length || 16));
-  const useLower = options.lower !== false;
-  const useUpper = options.upper !== false;
-  const useDigits = options.digits !== false;
-  const useSymbols = options.symbols === true || options.symbols === undefined; // default include symbols
+  // Always include all character classes by default
+  const useLower = options.lower !== false; // default true
+  const useUpper = options.upper !== false; // default true
+  const useDigits = options.digits !== false; // default true
+  const useSymbols = options.symbols !== false; // default true, unless explicitly disabled
 
   const lowers = 'abcdefghijklmnopqrstuvwxyz';
   const uppers = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const digits = '0123456789';
-  const symbols = '!@#$%^&*()-_=+[]{};:,.<>/?';
+  // Wide symbol set (commonly allowed). Excludes space.
+  const symbols = "!\"#$%&'()*+,-./:;<=>?@[]^_`{|}~\\"; // includes backslash and quotes
 
   let pool = '';
   if (useLower) pool += lowers;
   if (useUpper) pool += uppers;
   if (useDigits) pool += digits;
   if (useSymbols) pool += symbols;
-  if (!pool) pool = lowers + uppers + digits;
+  if (!pool) pool = lowers + uppers + digits + symbols;
 
   // cryptographically secure random index function
   const rnd = () => {

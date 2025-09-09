@@ -25,7 +25,7 @@
 
     <section id="vaultView" class="view hidden">
       <div class="toolbar">
-        <input id="search" class="input" type="text" placeholder="Search" />
+        <input id="search" class="input" type="text" placeholder="Search by username or site" />
         <button id="addToggle" class="btn">+ Add</button>
       </div>
       <ul id="list" class="list"></ul>
@@ -48,6 +48,28 @@
         </div>
       </details>
     </section>
+
+    <dialog id="editDialog">
+      <form method="dialog" class="dialog-body">
+        <h2 class="dialog-title">Edit Credential</h2>
+        <input id="editId" type="hidden" />
+        <label class="label">Origins (comma separated)</label>
+        <input id="editOrigins" class="input" type="text" />
+        <label class="label">Username</label>
+        <input id="editUser" class="input" type="text" />
+        <label class="label">Password</label>
+        <div class="row">
+          <input id="editPass" class="input" type="text" />
+          <button id="editGen" class="btn" title="Generate" type="button">Generate</button>
+        </div>
+        <label class="label">Notes</label>
+        <textarea id="editNotes" class="input" rows="3"></textarea>
+        <div class="row right">
+          <button id="editCancel" class="btn" value="cancel">Cancel</button>
+          <button id="editSave" class="btn primary" value="default">Save</button>
+        </div>
+      </form>
+    </dialog>
   </div>
 
   <script src="popup.js"></script>
