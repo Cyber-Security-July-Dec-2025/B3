@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PassVault</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="brand">
+        <img src="assets/icon.svg" alt="PassVault" class="icon" />
+        <h1>PassVault</h1>
+      </div>
+      <button id="lockBtn" title="Lock" class="btn">Lock</button>
+    </header>
+
+    <section id="lockedView" class="view">
+      <label class="label">Master Password</label>
+      <input id="masterInput" class="input" type="password" autofocus />
+      <button id="unlockBtn" class="btn primary">Unlock</button>
+      <div id="unlockError" class="error"></div>
+    </section>
+
+    <section id="vaultView" class="view hidden">
+      <div class="toolbar">
+        <input id="search" class="input" type="text" placeholder="Search" />
+        <button id="addToggle" class="btn">+ Add</button>
+      </div>
+      <ul id="list" class="list"></ul>
+
+      <details id="addPanel" class="panel">
+        <summary class="summary">Add Credential</summary>
+        <label class="label">Origins (comma separated)</label>
+        <input id="inOrigins" class="input" type="text" placeholder="https://example.com" />
+        <label class="label">Username</label>
+        <input id="inUser" class="input" type="text" />
+        <label class="label">Password</label>
+        <div class="row">
+          <input id="inPass" class="input" type="text" />
+          <button id="genBtn" class="btn" title="Generate">Generate</button>
+        </div>
+        <label class="label">Notes</label>
+        <textarea id="inNotes" class="input" rows="3"></textarea>
+        <div class="row right">
+          <button id="saveBtn" class="btn primary">Save</button>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
