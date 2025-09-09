@@ -19,7 +19,7 @@ export async function deriveKeyPBKDF2(password, salt, iterations = 310000) {
     },
     baseKey,
     { name: 'AES-GCM', length: 256 },
-    false,
+    true, // extractable so we can export to chrome.storage.session for MV3 service worker resume
     ['encrypt', 'decrypt']
   );
 }

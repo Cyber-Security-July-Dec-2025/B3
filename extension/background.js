@@ -9,7 +9,7 @@ const VAULT_STORE = 'vault';
 const VAULT_KEY = 'default';
 const META_KEY = 'meta';
 
-let derivedKey = null; // CryptoKey when unlocked
+let derivedKey = null; // CryptoKey when unlocked (restored from chrome.storage.session if service worker is restarted)
 let unlockedAt = 0;
 let autolockMs = 5 * 60 * 1000; // default 5 minutes
 
@@ -23,14 +23,21 @@ async function saveMeta(meta) {
 }
 
 function resetAutolockTimer() {
-  unlockedAt = Date.now();
-  chrome.alarms.clear('autolock');
-  chrome.alarms.create('autolock', { when: Date.now() + autolockMs });
+  try {
+    unlockedAt = Date.now();
+    const minutes = Math.max(1, Math.round((autolockMs || 5 * 60 * 1000) / 60000));
+    chrome.alarms.clear('autolock', () => {
+      chrome.alarms.create('autolock', { delayInMinutes: minutes });
+    });
+  } catch (e) {
+    console.warn('Failed to set autolock alarm', e);
+  }
 }
 
 async function lockVault() {
   derivedKey = null;
   unlockedAt = 0;
+  try { await chrome.storage.session.remove('unlockedKeyJwk'); } catch (_) {}
 }
 
 async function ensureInit() {
@@ -62,14 +69,31 @@ async function deriveKeyFromMeta(password) {
 async function getVaultJson() {
   const enc = await idbGet(VAULT_STORE, VAULT_KEY);
   if (!enc) return { creds: [] };
+  if (!derivedKey) await tryRestoreKeyFromSession();
   if (!derivedKey) throw new Error('Vault is locked');
   return decryptJSON(enc, derivedKey);
 }
 
 async function setVaultJson(json) {
+  if (!derivedKey) await tryRestoreKeyFromSession();
   if (!derivedKey) throw new Error('Vault is locked');
   const enc = await encryptJSON(json, derivedKey);
   await idbSet(VAULT_STORE, VAULT_KEY, enc);
+}
+
+async function tryRestoreKeyFromSession() {
+  try {
+    const { unlockedKeyJwk } = await chrome.storage.session.get('unlockedKeyJwk');
+    if (!unlockedKeyJwk) return;
+    derivedKey = await crypto.subtle.importKey(
+      'jwk',
+      unlockedKeyJwk,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+    if (derivedKey) resetAutolockTimer();
+  } catch (_) {}
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -78,10 +102,8 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'autolock') {
-    if (derivedKey && Date.now() - unlockedAt >= autolockMs - 1000) {
+    if (derivedKey) {
       lockVault();
-    } else if (derivedKey) {
-      resetAutolockTimer();
     }
   }
 });
@@ -90,6 +112,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
       if (msg.type === 'STATUS') {
+        if (!derivedKey) await tryRestoreKeyFromSession();
         sendResponse({ ok: true, unlocked: !!derivedKey });
         return;
       }
@@ -112,6 +135,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         derivedKey = key;
         resetAutolockTimer();
+        // Persist key for session resume
+        try {
+          const jwk = await crypto.subtle.exportKey('jwk', derivedKey);
+          await chrome.storage.session.set({ unlockedKeyJwk: jwk });
+        } catch (e) {
+          // ignore if export not allowed
+        }
         sendResponse({ ok: true });
         return;
       }
@@ -121,6 +151,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
       if (msg.type === 'GET_CREDENTIALS_FOR_ORIGIN') {
+        if (!derivedKey) await tryRestoreKeyFromSession();
         if (!derivedKey) throw new Error('Locked');
         resetAutolockTimer();
         const { origin } = msg;
@@ -130,6 +161,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
       if (msg.type === 'SAVE_CREDENTIAL') {
+        if (!derivedKey) await tryRestoreKeyFromSession();
         if (!derivedKey) throw new Error('Locked');
         resetAutolockTimer();
         const { credential } = msg; // {id, origin(s), username, password, notes}
@@ -141,6 +173,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
       if (msg.type === 'LIST_CREDENTIALS') {
+        if (!derivedKey) await tryRestoreKeyFromSession();
         if (!derivedKey) throw new Error('Locked');
         resetAutolockTimer();
         const vault = await getVaultJson();
@@ -148,6 +181,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
       if (msg.type === 'DELETE_CREDENTIAL') {
+        if (!derivedKey) await tryRestoreKeyFromSession();
         if (!derivedKey) throw new Error('Locked');
         resetAutolockTimer();
         const { id } = msg;
