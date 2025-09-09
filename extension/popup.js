@@ -71,11 +71,20 @@ async function refreshList() {
 }
 
 async function saveCredential() {
-  const origins = el('inOrigins').value.split(',').map(s => s.trim()).filter(Boolean);
+  let origins = el('inOrigins').value.split(',').map(s => s.trim()).filter(Boolean);
   const username = el('inUser').value;
   const password = el('inPass').value;
   const notes = el('inNotes').value;
   if (!password) return alert('Password is required');
+  if (origins.length === 0) {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const url = tabs && tabs[0] && tabs[0].url;
+      if (url && /^https?:/i.test(url)) {
+        origins = [new URL(url).origin];
+      }
+    } catch (_) {}
+  }
   const credential = {
     id: crypto.randomUUID(),
     origins,

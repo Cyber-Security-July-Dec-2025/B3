@@ -3,25 +3,41 @@
 (function () {
   const origin = location.origin;
 
+  const DEBUG = false;
+
+  function log(...args){ if (DEBUG) console.debug('[PassVault]', ...args); }
+
   function findFields() {
-    // prefer visible password field
-    const pwAll = Array.from(document.querySelectorAll('input[type="password"]'))
-      .filter(isVisible);
-    const pw = pwAll[0] || null;
-    if (!pw) return null;
+    // collect candidate password fields that are visible and not disabled
+    const pwAll = Array.from(document.querySelectorAll('input[type="password" i]'))
+      .filter(isVisible)
+      .filter(el => !el.disabled && !el.readOnly);
+    if (pwAll.length === 0) return null;
+
+    // choose the one inside a form with a likely submit button if possible
+    let pw = null;
+    for (const cand of pwAll) {
+      const form = cand.closest('form');
+      if (form && form.querySelector('button[type="submit"], input[type="submit"], button:not([type])')) { pw = cand; break; }
+    }
+    pw = pw || pwAll[0];
+
     const scope = pw.closest('form') || document;
     const inputs = Array.from(scope.querySelectorAll('input'));
     let user = null;
-    const userHints = ['user', 'email', 'login', 'id', 'mail'];
+    const userHints = ['user', 'email', 'login', 'id', 'mail', 'account', 'phone'];
     for (const el of inputs) {
       if (el === pw) continue;
       const t = (el.type || 'text').toLowerCase();
       const nm = (el.name || '').toLowerCase();
       const id = (el.id || '').toLowerCase();
       const pl = (el.placeholder || '').toLowerCase();
+      const ac = (el.autocomplete || '').toLowerCase();
       if (['text', 'email', 'username'].includes(t)) user = user || el;
+      if (['username', 'email'].includes(ac)) user = user || el;
       if (userHints.some(h => nm.includes(h) || id.includes(h) || pl.includes(h))) user = user || el;
     }
+    log('findFields ->', { pw, user, scope });
     return { form: scope === document ? null : scope, user, pw };
   }
 
@@ -103,8 +119,10 @@
     const creds = resp.creds || [];
     if (creds.length === 0) return;
     if (creds.length === 1) {
+      log('autofill with single cred');
       applyCred(creds[0]);
     } else if (showPicker) {
+      log('show picker with', creds.length, 'creds');
       renderPicker(creds, fields.pw);
     }
   }
