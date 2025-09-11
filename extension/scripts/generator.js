@@ -27,8 +27,14 @@ export function generatePassword(options = {}) {
   const lowers = 'abcdefghijklmnopqrstuvwxyz';
   const uppers = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const digits = '0123456789';
-  // Wide symbol set (commonly allowed). Excludes space.
-  const symbols = "!\"#$%&'()*+,-./:;<=>?@[]^_`{|}~\\"; // includes backslash and quotes
+  // Build the symbols set from all printable ASCII (33-126) excluding alphanumerics
+  // This captures a comprehensive set of special ASCII symbols.
+  let symbols = '';
+  for (let code = 33; code <= 126; code++) {
+    const ch = String.fromCharCode(code);
+    if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) continue;
+    symbols += ch;
+  }
 
   let pool = '';
   if (useLower) pool += lowers;

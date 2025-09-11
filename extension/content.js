@@ -138,6 +138,10 @@
           const username = user ? user.value : '';
           const password = pw ? pw.value : '';
           if (!password) return; // don't save empty
+          // Ask user before saving
+          const host = (() => { try { return new URL(location.href).host; } catch (_) { return location.host || origin; } })();
+          const ok = window.confirm(`Save password for ${host}?`);
+          if (!ok) return; // user declined
           const id = crypto.randomUUID();
           const credential = { id, origins: [origin], origin, username, password, notes: '' };
           await chrome.runtime.sendMessage({ type: 'SAVE_CREDENTIAL', credential });

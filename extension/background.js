@@ -5,6 +5,12 @@ import { deriveKeyPBKDF2, encryptJSON, decryptJSON, bytesToBase64, base64ToBytes
 import { idbGet, idbSet, ensureDB } from './scripts/storage.js';
 import { generatePassword } from './scripts/generator.js';
 
+// Minimal logging gate to avoid console noise in production (e.g., Chrome Web Store)
+const DEBUG = false;
+function logDebug(...args){ if (DEBUG) console.debug('[PassVault]', ...args); }
+function logWarn(...args){ if (DEBUG) console.warn('[PassVault]', ...args); }
+function logError(...args){ if (DEBUG) console.error('[PassVault]', ...args); }
+
 const VAULT_STORE = 'vault';
 const VAULT_KEY = 'default';
 const META_KEY = 'meta';
@@ -30,7 +36,7 @@ function resetAutolockTimer() {
       chrome.alarms.create('autolock', { delayInMinutes: minutes });
     });
   } catch (e) {
-    console.warn('Failed to set autolock alarm', e);
+    logWarn('Failed to set autolock alarm', e);
   }
 }
 
@@ -217,7 +223,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       sendResponse({ ok: false, error: 'Unknown message' });
     } catch (e) {
-      console.error(e);
+      logError('background message error', e);
       sendResponse({ ok: false, error: e.message || String(e) });
     }
   })();
@@ -271,6 +277,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       await chrome.tabs.sendMessage(tab.id, { type: 'APPLY_CREDENTIAL', cred, origin }, { frameId: info.frameId });
     }
   } catch (e) {
-    console.warn('context menu action failed', e);
+    logWarn('context menu action failed', e);
   }
 });
