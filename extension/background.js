@@ -212,7 +212,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
       if (msg.type === 'SET_AUTOLOCK') {
-        const { ms } = msg;
+        let { ms } = msg;
+        ms = Number(ms);
+        if (!Number.isFinite(ms) || ms < 60 * 1000) {
+          sendResponse({ ok: false, error: 'Invalid autolock value; must be >= 1 minute' });
+          return;
+        }
         const meta = await loadMeta();
         meta.autolockMs = ms;
         await saveMeta(meta);

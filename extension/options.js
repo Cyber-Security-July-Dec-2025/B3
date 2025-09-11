@@ -13,10 +13,18 @@ async function load() {
 }
 
 async function saveSecurity() {
-  const minutes = parseInt(document.getElementById('minutes').value || '5', 10);
+  let minutes = parseInt(document.getElementById('minutes').value || '5', 10);
+  if (!Number.isFinite(minutes) || minutes < 1) {
+    alert('Please enter a valid number of minutes (>= 1).');
+    return;
+  }
   const ms = Math.max(1, minutes) * 60 * 1000;
-  await chrome.runtime.sendMessage({ type: 'SET_AUTOLOCK', ms });
-  alert('Security settings saved');
+  const resp = await chrome.runtime.sendMessage({ type: 'SET_AUTOLOCK', ms });
+  if (resp && resp.ok) {
+    alert('Security settings saved');
+  } else {
+    alert('Failed to save: ' + ((resp && resp.error) || 'Unknown error'));
+  }
 }
 
 async function saveTheme() {

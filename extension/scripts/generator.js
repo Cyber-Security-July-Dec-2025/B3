@@ -3,7 +3,8 @@
 
 function pick(chars, n, rnd) {
   let out = '';
-  for (let i = 0; i < n; i++) out += chars[rnd()];
+  if (!chars || chars.length === 0 || n <= 0) return out;
+  for (let i = 0; i < n; i++) out += chars[rnd() % chars.length];
   return out;
 }
 
@@ -60,5 +61,25 @@ export function generatePassword(options = {}) {
   let rest = '';
   for (let i = base.length; i < length; i++) rest += pool[rnd() % pool.length];
 
-  return shuffle(base + rest, rnd);
+  let pwd = shuffle(base + rest, rnd);
+
+  // Verify and patch: ensure at least one of each selected class exists
+  const hasLower = /[a-z]/.test(pwd);
+  const hasUpper = /[A-Z]/.test(pwd);
+  const hasDigit = /\d/.test(pwd);
+  const hasSymbol = /[^0-9A-Za-z]/.test(pwd);
+
+  // Helper to replace a random position with a char from set
+  const replaceWith = (set) => {
+    const pos = rnd() % pwd.length;
+    const ch = set[rnd() % set.length];
+    pwd = pwd.substring(0, pos) + ch + pwd.substring(pos + 1);
+  };
+
+  if (useLower && !hasLower) replaceWith(lowers);
+  if (useUpper && !hasUpper) replaceWith(uppers);
+  if (useDigits && !hasDigit) replaceWith(digits);
+  if (useSymbols && !hasSymbol) replaceWith(symbols);
+
+  return pwd;
 }
