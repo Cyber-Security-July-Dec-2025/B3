@@ -55,6 +55,14 @@
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  // Track when the user manually edits inputs so we do not overwrite their changes
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t && t.tagName === 'INPUT') {
+      t.dataset.passvaultEdited = '1';
+    }
+  }, true);
+
   async function fetchCreds() {
     try {
       return await chrome.runtime.sendMessage({ type: 'GET_CREDENTIALS_FOR_ORIGIN', origin });
@@ -107,13 +115,27 @@
     const fields = findFields();
     if (!fields || !fields.pw) return;
     const { user, pw } = fields;
-    if (user && cred.username) setValue(user, cred.username);
+    if (user && cred.username) {
+      setValue(user, cred.username);
+      user.dataset.passvaultApplied = '1';
+    }
     setValue(pw, cred.password || '');
+    pw.dataset.passvaultApplied = '1';
   }
 
   async function maybeAutofill(showPicker = true) {
     const fields = findFields();
     if (!fields || !fields.pw) return;
+    // Respect user edits: do not autofill once user started typing
+    if ((fields.user && fields.user.dataset.passvaultEdited === '1') || (fields.pw && fields.pw.dataset.passvaultEdited === '1')) {
+      log('skip autofill due to user edits');
+      return;
+    }
+    // Avoid repeatedly reapplying if we've already applied once and the field has a value
+    if (fields.pw && fields.pw.dataset.passvaultApplied === '1' && fields.pw.value) {
+      log('skip autofill; already applied');
+      return;
+    }
     const resp = await fetchCreds();
     if (!resp || !resp.ok) return; // possibly locked
     const creds = resp.creds || [];
